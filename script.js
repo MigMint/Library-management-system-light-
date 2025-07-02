@@ -514,15 +514,30 @@ async function processManualEntry() {
 async function processBookTransaction(bookId) {
     showLoading(true);
     
-    // Extract book ID from barcode if needed
-    if (bookId.startsWith('LIB')) {
-        bookId = bookId.substring(3); // Remove 'LIB' prefix
-        // Convert back to Firebase format if needed
+    console.log('Processing book ID:', bookId); // Debug log
+    
+    // Try to find book with different ID formats
+    let book = await getBook(bookId);
+    
+    // If not found and starts with LIB, try without prefix
+    if (!book && bookId.startsWith('LIB')) {
+        const shortId = bookId.substring(3);
+        console.log('Trying without LIB prefix:', shortId);
+        
+        // Try to find book by searching through all books
+        const allBooks = await getBooks();
+        book = allBooks.find(b => 
+            b.id === bookId || 
+            b.id === shortId ||
+            b.id.toUpperCase().includes(shortId) ||
+            generateBarcodeData(b.id) === bookId
+        );
     }
     
-    const book = await getBook(bookId);
+    console.log('Book found:', book); // Debug log
+    
     if (!book) {
-        alert('Book not found!');
+        alert('Book not found! Scanned ID: ' + bookId + '\nPlease check if this book exists in the system.');
         showLoading(false);
         return;
     }
@@ -1080,11 +1095,3 @@ function parseCSVLine(line) {
     values.push(current); // Add last value
     return values;
 }
-
-// Check for overdue books daily
-setInterval(() => {
-    const hour = new Date().getHours();
-    if (hour === 9) { // Check at 9 AM
-        checkOverdueBooks();
-    }
-}, 3600000); // Check every hour
