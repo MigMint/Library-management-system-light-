@@ -301,7 +301,7 @@ function showDashboard() {
     // Set up real-time listeners
     listenToBooks((books) => {
         allBooks = books;
-        filterBooks();
+        filterBooks(); // This will automatically reapply filters
     });
     listenToTransactions(displayTransactions);
 }
@@ -318,7 +318,11 @@ function showSection(section) {
     // Load section-specific data
     switch(section) {
         case 'books':
-            loadBooks();
+            if (allBooks.length > 0) {
+                filterBooks(); // Reapply filters when showing books
+            } else {
+                loadBooks();
+            }
             break;
         case 'manage':
             loadManageBooks();
@@ -328,6 +332,9 @@ function showSection(section) {
             break;
         case 'borrow':
             loadTransactions();
+            break;
+        case 'profile':
+            loadUserBorrowedBooks();
             break;
     }
 }
@@ -361,6 +368,7 @@ async function handleAddBook(e) {
 
 async function loadBooks() {
     allBooks = await getBooks();
+    filteredBooks = allBooks; // Initialize filtered books
     filterBooks();
 }
 
@@ -370,9 +378,10 @@ function filterBooks() {
     const statusFilter = document.getElementById('statusFilter').value;
     
     filteredBooks = allBooks.filter(book => {
-        const matchesSearch = book.title.toLowerCase().includes(searchTerm) || 
+        const matchesSearch = !searchTerm || 
+                            book.title.toLowerCase().includes(searchTerm) || 
                             book.author.toLowerCase().includes(searchTerm) ||
-                            book.isbn.includes(searchTerm);
+                            book.isbn.toLowerCase().includes(searchTerm);
         const matchesCategory = !categoryFilter || book.category === categoryFilter;
         const matchesStatus = !statusFilter || 
                             (statusFilter === 'available' && book.available) ||
@@ -381,7 +390,7 @@ function filterBooks() {
         return matchesSearch && matchesCategory && matchesStatus;
     });
     
-    currentPage = 1;
+    currentPage = 1; // Reset to first page when filtering
     displayBooksPage();
 }
 
@@ -390,48 +399,56 @@ function displayBooksPage() {
     const endIndex = startIndex + booksPerPage;
     const booksToDisplay = filteredBooks.slice(startIndex, endIndex);
     
-    displayBooks(booksToDisplay);
-    updatePaginationInfo();
-}
-
-function displayBooks(books) {
     const booksList = document.getElementById('booksList');
     booksList.innerHTML = '';
     
-    if (books.length === 0) {
+    if (booksToDisplay.length === 0 && currentPage === 1) {
         booksList.innerHTML = '<p style="text-align: center; grid-column: 1/-1;">No books found</p>';
-        return;
+    } else {
+        booksToDisplay.forEach(book => {
+            const bookCard = document.createElement('div');
+            bookCard.className = 'book-card';
+            bookCard.onclick = () => showBookDetails(book);
+            
+            bookCard.innerHTML = `
+                <h3>${book.title}</h3>
+                <p><strong>Author:</strong> ${book.author}</p>
+                <p><strong>ISBN:</strong> ${book.isbn}</p>
+                <p><strong>Category:</strong> ${book.category}</p>
+                <div class="book-status ${book.available ? 'status-available' : 'status-borrowed'}">
+                    ${book.available ? 'Available' : 'Borrowed'}
+                </div>
+            `;
+            
+            booksList.appendChild(bookCard);
+        });
     }
     
-    books.forEach(book => {
-        const bookCard = document.createElement('div');
-        bookCard.className = 'book-card';
-        bookCard.onclick = () => showBookDetails(book);
-        
-        bookCard.innerHTML = `
-            <h3>${book.title}</h3>
-            <p><strong>Author:</strong> ${book.author}</p>
-            <p><strong>ISBN:</strong> ${book.isbn}</p>
-            <p><strong>Category:</strong> ${book.category}</p>
-            <div class="book-status ${book.available ? 'status-available' : 'status-borrowed'}">
-                ${book.available ? 'Available' : 'Borrowed'}
-            </div>
-        `;
-        
-        booksList.appendChild(bookCard);
-    });
+    updatePaginationInfo();
 }
 
 function updatePaginationInfo() {
-    const totalPages = Math.ceil(filteredBooks.length / booksPerPage);
-    document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+    const totalPages = Math.ceil(filteredBooks.length / booksPerPage) || 1;
+    document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages} (${filteredBooks.length} books)`;
     
     document.getElementById('prevBtn').disabled = currentPage === 1;
-    document.getElementById('nextBtn').disabled = currentPage === totalPages || totalPages === 0;
+    document.getElementById('nextBtn').disabled = currentPage >= totalPages;
     
     // Update button styles
     document.getElementById('prevBtn').style.opacity = currentPage === 1 ? '0.5' : '1';
-    document.getElementById('nextBtn').style.opacity = (currentPage === totalPages || totalPages === 0) ? '0.5' : '1';
+    document.getElementById('prevBtn').style.cursor = currentPage === 1 ? 'not-allowed' : 'pointer';
+    document.getElementById('nextBtn').style.opacity = currentPage >= totalPages ? '0.5' : '1';
+    document.getElementById('nextBtn').style.cursor = currentPage >= totalPages ? 'not-allowed' : 'pointer';
+}
+
+// Remove the old displayBooks function completely
+// Update the real-time listener in showDashboard
+function setupBooksListener() {
+    listenToBooks((books) => {
+        allBooks = books;
+        filteredBooks = books;
+        filterBooks(); // This will automatically apply current filters
+    });
 }
 
 window.filterBooks = filterBooks;
@@ -450,7 +467,7 @@ window.nextPage = function() {
     }
 };
 
-// Update search function
+// Update search function to just call filterBooks
 function searchBooks() {
     filterBooks();
 }
