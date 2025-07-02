@@ -2,6 +2,10 @@
 let currentUser = null;
 let currentUserProfile = null;
 let html5QrcodeScanner = null;
+let allBooks = [];
+let filteredBooks = [];
+let currentPage = 1;
+const booksPerPage = 10;
 
 // Language translations
 const translations = {
@@ -295,7 +299,10 @@ function showDashboard() {
     loadUserBorrowedBooks();
     
     // Set up real-time listeners
-    listenToBooks(displayBooks);
+    listenToBooks((books) => {
+        allBooks = books;
+        filterBooks();
+    });
     listenToTransactions(displayTransactions);
 }
 
@@ -344,6 +351,7 @@ async function handleAddBook(e) {
     if (result.success) {
         document.getElementById('addBookForm').reset();
         alert('Book added successfully!');
+        loadBooks(); // Reload books
     } else {
         alert('Failed to add book: ' + result.error);
     }
@@ -352,13 +360,48 @@ async function handleAddBook(e) {
 }
 
 async function loadBooks() {
-    const books = await getBooks();
-    displayBooks(books);
+    allBooks = await getBooks();
+    filterBooks();
+}
+
+function filterBooks() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const categoryFilter = document.getElementById('categoryFilter').value;
+    const statusFilter = document.getElementById('statusFilter').value;
+    
+    filteredBooks = allBooks.filter(book => {
+        const matchesSearch = book.title.toLowerCase().includes(searchTerm) || 
+                            book.author.toLowerCase().includes(searchTerm) ||
+                            book.isbn.includes(searchTerm);
+        const matchesCategory = !categoryFilter || book.category === categoryFilter;
+        const matchesStatus = !statusFilter || 
+                            (statusFilter === 'available' && book.available) ||
+                            (statusFilter === 'borrowed' && !book.available);
+        
+        return matchesSearch && matchesCategory && matchesStatus;
+    });
+    
+    currentPage = 1;
+    displayBooksPage();
+}
+
+function displayBooksPage() {
+    const startIndex = (currentPage - 1) * booksPerPage;
+    const endIndex = startIndex + booksPerPage;
+    const booksToDisplay = filteredBooks.slice(startIndex, endIndex);
+    
+    displayBooks(booksToDisplay);
+    updatePaginationInfo();
 }
 
 function displayBooks(books) {
     const booksList = document.getElementById('booksList');
     booksList.innerHTML = '';
+    
+    if (books.length === 0) {
+        booksList.innerHTML = '<p style="text-align: center; grid-column: 1/-1;">No books found</p>';
+        return;
+    }
     
     books.forEach(book => {
         const bookCard = document.createElement('div');
@@ -377,6 +420,39 @@ function displayBooks(books) {
         
         booksList.appendChild(bookCard);
     });
+}
+
+function updatePaginationInfo() {
+    const totalPages = Math.ceil(filteredBooks.length / booksPerPage);
+    document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+    
+    document.getElementById('prevBtn').disabled = currentPage === 1;
+    document.getElementById('nextBtn').disabled = currentPage === totalPages || totalPages === 0;
+    
+    // Update button styles
+    document.getElementById('prevBtn').style.opacity = currentPage === 1 ? '0.5' : '1';
+    document.getElementById('nextBtn').style.opacity = (currentPage === totalPages || totalPages === 0) ? '0.5' : '1';
+}
+
+window.filterBooks = filterBooks;
+window.previousPage = function() {
+    if (currentPage > 1) {
+        currentPage--;
+        displayBooksPage();
+    }
+};
+
+window.nextPage = function() {
+    const totalPages = Math.ceil(filteredBooks.length / booksPerPage);
+    if (currentPage < totalPages) {
+        currentPage++;
+        displayBooksPage();
+    }
+};
+
+// Update search function
+function searchBooks() {
+    filterBooks();
 }
 
 async function loadManageBooks() {
@@ -645,6 +721,10 @@ async function loadUsers() {
     if (currentUserProfile.role !== 'staff') return;
     
     const users = await getAllUsers();
+    displayUsers(users);
+}
+
+function displayUsers(users) {
     const usersList = document.getElementById('usersList');
     usersList.innerHTML = '';
     
@@ -652,16 +732,22 @@ async function loadUsers() {
         const userItem = document.createElement('div');
         userItem.className = 'user-item';
         
+        // Count borrowed books
+        const borrowedCount = user.borrowedBooks ? user.borrowedBooks.length : 0;
+        
         userItem.innerHTML = `
             <div>
                 <strong>${user.name}</strong>
                 <br>
                 <small>${user.email}</small>
+                <br>
+                <small style="color: var(--warning-color);">Borrowed Books: ${borrowedCount}</small>
             </div>
             <div>
                 <span class="user-role role-${user.role}">${user.role}</span>
+                <button class="action-btn view-btn" onclick="window.viewUserDetails('${user.id}')" style="margin-left: 10px;">View Details</button>
                 ${user.id !== currentUser.uid ? `
-                    <button class="action-btn edit-btn" onclick="changeUserRole('${user.id}', '${user.role}')">Change Role</button>
+                    <button class="action-btn edit-btn" onclick="window.changeUserRole('${user.id}', '${user.role}')">Change Role</button>
                 ` : ''}
             </div>
         `;
@@ -669,6 +755,105 @@ async function loadUsers() {
         usersList.appendChild(userItem);
     });
 }
+
+window.viewUserDetails = async function(userId) {
+    showLoading(true);
+    const user = await getUserProfile(userId);
+    const borrowedBooks = user.borrowedBooks || [];
+    
+    let borrowedBooksHtml = '<h3>Borrowed Books</h3>';
+    
+    if (borrowedBooks.length === 0) {
+        borrowedBooksHtml += '<p>No borrowed books</p>';
+    } else {
+        borrowedBooksHtml += '<div style="max-height: 300px; overflow-y: auto;">';
+        
+        for (const borrowed of borrowedBooks) {
+            const book = await getBook(borrowed.bookId);
+            const returnDate = new Date(borrowed.returnDate);
+            const today = new Date();
+            const daysLeft = Math.ceil((returnDate - today) / (1000 * 60 * 60 * 24));
+            
+            let statusClass = '';
+            let statusText = '';
+            
+            if (daysLeft < 0) {
+                statusClass = 'overdue';
+                statusText = `${Math.abs(daysLeft)} days overdue`;
+            } else if (daysLeft <= 3) {
+                statusClass = 'due-soon';
+                statusText = `${daysLeft} days left`;
+            } else {
+                statusText = `${daysLeft} days left`;
+            }
+            
+            borrowedBooksHtml += `
+                <div class="borrowed-book-item ${statusClass}" style="margin-bottom: 10px;">
+                    <div>
+                        <strong>${book?.title || 'Unknown Book'}</strong>
+                        <br>
+                        <small>Borrowed: ${new Date(borrowed.borrowedDate).toLocaleDateString()}</small>
+                        <br>
+                        <small>Return by: ${returnDate.toLocaleDateString()} (${statusText})</small>
+                    </div>
+                    <div>
+                        <button onclick="window.sendReminder('${user.email}', '${user.name}', '${book?.title}', '${daysLeft}')" 
+                                class="action-btn" 
+                                style="background: var(--warning-color); color: white;">
+                            Send Reminder
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        borrowedBooksHtml += '</div>';
+    }
+    
+    const detailsHtml = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div>
+                <p><strong>Name:</strong> ${user.name}</p>
+                <p><strong>Email:</strong> ${user.email}</p>
+            </div>
+            <div>
+                <p><strong>Role:</strong> <span class="user-role role-${user.role}">${user.role}</span></p>
+                <p><strong>Member Since:</strong> ${new Date(user.joinDate).toLocaleDateString()}</p>
+            </div>
+        </div>
+        ${borrowedBooksHtml}
+    `;
+    
+    document.getElementById('userDetailsContent').innerHTML = detailsHtml;
+    document.getElementById('userDetailsModal').style.display = 'block';
+    showLoading(false);
+};
+
+window.closeUserModal = function() {
+    document.getElementById('userDetailsModal').style.display = 'none';
+};
+
+window.sendReminder = function(email, name, bookTitle, daysLeft) {
+    if (confirm(`Send reminder email to ${name} about "${bookTitle}"?`)) {
+        if (daysLeft < 0) {
+            sendReturnReminder(email, name, bookTitle, Math.abs(daysLeft));
+            alert('Overdue reminder sent!');
+        } else {
+            sendBorrowConfirmation(email, name, bookTitle, new Date().toISOString());
+            alert('Reminder sent!');
+        }
+    }
+};
+
+window.searchUsers = function() {
+    const searchTerm = document.getElementById('userSearchInput').value.toLowerCase();
+    const userItems = document.querySelectorAll('.user-item');
+    
+    userItems.forEach(item => {
+        const text = item.textContent.toLowerCase();
+        item.style.display = text.includes(searchTerm) ? 'flex' : 'none';
+    });
+};
 
 async function changeUserRole(userId, currentRole) {
     const newRole = currentRole === 'staff' ? 'user' : 'staff';
@@ -962,6 +1147,10 @@ window.deleteBookConfirm = deleteBookConfirm;
 window.changeUserRole = changeUserRole;
 window.searchBooks = searchBooks;
 window.switchLanguage = switchLanguage;
+window.viewUserDetails = viewUserDetails;
+window.closeUserModal = closeUserModal;
+window.sendReminder = sendReminder;
+window.searchUsers = searchUsers;
 
 // Date picker helper functions
 window.confirmBorrow = async function(bookId) {
