@@ -89,10 +89,36 @@
         <!-- Books Section -->
         <section id="booksSection" class="content-section">
             <h2 data-translate="books_title">Library Books</h2>
-            <div class="search-bar">
-                <input type="text" id="searchInput" placeholder="Search books..." onkeyup="window.searchBooks()">
+            
+            <!-- Search and Filter Bar -->
+            <div class="filter-container" style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+                <input type="text" id="searchInput" placeholder="Search books..." onkeyup="window.searchBooks()" style="flex: 1; min-width: 200px; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                
+                <select id="categoryFilter" onchange="window.filterBooks()" style="padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                    <option value="">All Categories</option>
+                    <option value="fiction">Fiction</option>
+                    <option value="non-fiction">Non-Fiction</option>
+                    <option value="science">Science</option>
+                    <option value="technology">Technology</option>
+                    <option value="history">History</option>
+                    <option value="other">Other</option>
+                </select>
+                
+                <select id="statusFilter" onchange="window.filterBooks()" style="padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                    <option value="">All Status</option>
+                    <option value="available">Available</option>
+                    <option value="borrowed">Borrowed</option>
+                </select>
             </div>
+            
             <div id="booksList" class="books-grid"></div>
+            
+            <!-- Pagination -->
+            <div id="pagination" style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 20px;">
+                <button onclick="window.previousPage()" id="prevBtn" style="padding: 8px 16px; background: var(--secondary-color); color: white; border: none; border-radius: 5px; cursor: pointer;">Previous</button>
+                <span id="pageInfo">Page 1</span>
+                <button onclick="window.nextPage()" id="nextBtn" style="padding: 8px 16px; background: var(--secondary-color); color: white; border: none; border-radius: 5px; cursor: pointer;">Next</button>
+            </div>
         </section>
 
         <!-- Borrow/Return Section -->
@@ -178,7 +204,22 @@
         <!-- Users Section (Staff Only) -->
         <section id="usersSection" class="content-section" style="display: none;">
             <h2 data-translate="users_title">Manage Users</h2>
+            
+            <!-- User Search -->
+            <div style="margin-bottom: 20px;">
+                <input type="text" id="userSearchInput" placeholder="Search users..." onkeyup="window.searchUsers()" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+            
             <div id="usersList"></div>
+            
+            <!-- User Details Modal -->
+            <div id="userDetailsModal" class="modal" style="display: none;">
+                <div class="modal-content" style="max-width: 800px;">
+                    <span class="close" onclick="window.closeUserModal()">&times;</span>
+                    <h2>User Details</h2>
+                    <div id="userDetailsContent"></div>
+                </div>
+            </div>
         </section>
 
         <!-- Rules Section -->
