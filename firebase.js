@@ -1,4 +1,4 @@
-    // Firebase Configuration
+//lukmanencem    // Firebase Configuration
 const firebaseConfig = {
     apiKey: "AIzaSyAgzsZp9Waa4W4IyhNRXIRPKm3h6hX2nrg",
     authDomain: "library-management-syste-fdc63.firebaseapp.com",
