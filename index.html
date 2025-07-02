@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Management System</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Language Switcher -->
+    <div class="language-switcher">
+        <button onclick="window.switchLanguage('en')" class="lang-btn active" data-lang="en">EN</button>
+        <button onclick="window.switchLanguage('ms')" class="lang-btn" data-lang="ms">BM</button>
+    </div>
+
+    <!-- Login Section -->
+    <div id="loginSection" class="auth-container">
+        <div class="auth-box">
+            <h2 data-translate="login_title">Library Management System</h2>
+            <form id="loginForm">
+                <input type="email" id="loginEmail" placeholder="Email" required>
+                <div style="position: relative;">
+                    <input type="password" id="loginPassword" placeholder="Password" required>
+                    <span onclick="window.togglePassword('loginPassword')" style="position: absolute; right: 10px; top: 12px; cursor: pointer;">👁️</span>
+                </div>
+                <button type="submit" data-translate="login_btn">Login</button>
+            </form>
+            <p class="auth-switch">
+                <span data-translate="no_account">Don't have an account?</span>
+                <a href="#" onclick="window.showRegister()" data-translate="register_link">Register</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Register Section -->
+    <div id="registerSection" class="auth-container" style="display: none;">
+        <div class="auth-box">
+            <h2 data-translate="register_title">Create Account</h2>
+            <form id="registerForm">
+                <input type="text" id="registerName" placeholder="Full Name" required>
+                <input type="email" id="registerEmail" placeholder="Email" required>
+                <div style="position: relative;">
+                    <input type="password" id="registerPassword" placeholder="Password" required>
+                    <span onclick="window.togglePassword('registerPassword')" style="position: absolute; right: 10px; top: 12px; cursor: pointer;">👁️</span>
+                </div>
+                <select id="registerRole" required>
+                    <option value="user" data-translate="role_user">User</option>
+                    <option value="staff" data-translate="role_staff">Staff</option>
+                </select>
+                <button type="submit" data-translate="register_btn">Register</button>
+            </form>
+            <p class="auth-switch">
+                <span data-translate="have_account">Already have an account?</span>
+                <a href="#" onclick="window.showLogin()" data-translate="login_link">Login</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboardSection" style="display: none;">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="nav-container">
+                <h1 data-translate="library_title">Library Management System</h1>
+                <div class="nav-links">
+                    <a href="#" onclick="window.showSection('books')" data-translate="nav_books">Books</a>
+                    <a href="#" onclick="window.showSection('borrow')" id="borrowLink" data-translate="nav_borrow">Borrow/Return</a>
+                    <a href="#" onclick="window.showSection('manage')" id="manageLink" style="display: none;" data-translate="nav_manage">Manage Books</a>
+                    <a href="#" onclick="window.showSection('users')" id="usersLink" style="display: none;" data-translate="nav_users">Users</a>
+                    <a href="#" onclick="window.showSection('rules')" data-translate="nav_rules">Rules</a>
+                    <a href="#" onclick="window.showSection('profile')" data-translate="nav_profile">Profile</a>
+                    <button onclick="window.logout()" class="logout-btn" data-translate="logout_btn">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Books Section -->
+        <section id="booksSection" class="content-section">
+            <h2 data-translate="books_title">Library Books</h2>
+            <div class="search-bar">
+                <input type="text" id="searchInput" placeholder="Search books..." onkeyup="window.searchBooks()">
+            </div>
+            <div id="booksList" class="books-grid"></div>
+        </section>
+
+        <!-- Borrow/Return Section -->
+        <section id="borrowSection" class="content-section" style="display: none;">
+            <h2 data-translate="borrow_title">Borrow & Return Books</h2>
+            
+            <!-- Barcode Scanner -->
+            <div class="scanner-container">
+                <h3 data-translate="scan_barcode">Scan Book Barcode</h3>
+                <p style="font-size: 14px; color: #666; margin-bottom: 10px;">
+                    Use your camera to scan or upload an image of the barcode
+                </p>
+                <div id="reader"></div>
+                <button onclick="window.startScanner()" id="startScanBtn" data-translate="start_scan">Start Scanner</button>
+                <button onclick="window.stopScanner()" id="stopScanBtn" style="display: none;" data-translate="stop_scan">Stop Scanner</button>
+                
+                <!-- Alternative: Upload barcode image -->
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+                    <p style="font-size: 14px; color: #666;">Or upload a barcode image:</p>
+                    <input type="file" id="barcodeFile" accept="image/*" onchange="window.scanBarcodeImage()" style="margin-top: 10px;">
+                </div>
+            </div>
+
+            <!-- Manual Entry -->
+            <div class="manual-entry">
+                <h3 data-translate="manual_entry">Or Enter Book ID Manually</h3>
+                <input type="text" id="manualBookId" placeholder="Enter Book ID">
+                <button onclick="window.processManualEntry()" data-translate="process_btn">Process</button>
+            </div>
+
+            <!-- Transaction History -->
+            <div class="transaction-history">
+                <h3 data-translate="transaction_history">Transaction History</h3>
+                <div id="transactionList"></div>
+            </div>
+        </section>
+
+        <!-- Manage Books Section (Staff Only) -->
+        <section id="manageSection" class="content-section" style="display: none;">
+            <h2 data-translate="manage_books_title">Manage Books</h2>
+            
+            <!-- CSV Import Section -->
+            <div class="csv-import-section" style="background: #f0f0f0; padding: 20px; border-radius: 10px; margin-bottom: 30px;">
+                <h3>Import Books from CSV</h3>
+                <p style="font-size: 14px; color: #666; margin-bottom: 10px;">
+                    CSV format: Title, Author, ISBN, Quantity, Category, Description<br>
+                    Example: "Harry Potter", "J.K. Rowling", "9780439708180", "5", "fiction", "A magical story"
+                </p>
+                <input type="file" id="csvFile" accept=".csv" style="margin-bottom: 10px;">
+                <button onclick="window.importCSV()" style="padding: 10px 20px; background: var(--warning-color); color: white; border: none; border-radius: 5px; cursor: pointer;">Import CSV</button>
+                <div id="importStatus" style="margin-top: 10px; font-size: 14px;"></div>
+            </div>
+            
+            <!-- Add Book Form -->
+            <div class="book-form">
+                <h3 data-translate="add_book">Add New Book</h3>
+                <form id="addBookForm">
+                    <input type="text" id="bookTitle" placeholder="Book Title" required>
+                    <input type="text" id="bookAuthor" placeholder="Author" required>
+                    <input type="text" id="bookISBN" placeholder="ISBN" required>
+                    <input type="number" id="bookQuantity" placeholder="Quantity" min="1" required>
+                    <select id="bookCategory" required>
+                        <option value="">Select Category</option>
+                        <option value="fiction">Fiction</option>
+                        <option value="non-fiction">Non-Fiction</option>
+                        <option value="science">Science</option>
+                        <option value="technology">Technology</option>
+                        <option value="history">History</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <textarea id="bookDescription" placeholder="Description" rows="3"></textarea>
+                    <button type="submit" data-translate="add_book_btn">Add Book</button>
+                </form>
+            </div>
+
+            <!-- Books Management List -->
+            <div class="manage-books-list">
+                <h3 data-translate="existing_books">Existing Books</h3>
+                <div id="manageBooksGrid"></div>
+            </div>
+        </section>
+
+        <!-- Users Section (Staff Only) -->
+        <section id="usersSection" class="content-section" style="display: none;">
+            <h2 data-translate="users_title">Manage Users</h2>
+            <div id="usersList"></div>
+        </section>
+
+        <!-- Rules Section -->
+        <section id="rulesSection" class="content-section" style="display: none;">
+            <h2 data-translate="rules_title">Library Rules & Regulations</h2>
+            <div class="rules-content">
+                <div data-translate="rules_content">
+                    <h3>Terms & Conditions</h3>
+                    <ol>
+                        <li>Books must be returned within 14 days from the date of borrowing.</li>
+                        <li>Late returns will incur a fine of RM 1.00 per day.</li>
+                        <li>Maximum of 3 books can be borrowed at one time.</li>
+                        <li>Lost or damaged books must be replaced or paid for.</li>
+                        <li>Reference books cannot be borrowed.</li>
+                        <li>Library card must be presented when borrowing books.</li>
+                        <li>Silence must be maintained in the library.</li>
+                        <li>Food and drinks are not allowed in the library.</li>
+                        <li>Books must be handled with care.</li>
+                        <li>Violation of rules may result in suspension of library privileges.</li>
+                    </ol>
+                </div>
+            </div>
+        </section>
+
+        <!-- Profile Section -->
+        <section id="profileSection" class="content-section" style="display: none;">
+            <h2 data-translate="profile_title">My Profile</h2>
+            <div class="profile-info">
+                <p><strong data-translate="name_label">Name:</strong> <span id="profileName"></span></p>
+                <p><strong data-translate="email_label">Email:</strong> <span id="profileEmail"></span></p>
+                <p><strong data-translate="role_label">Role:</strong> <span id="profileRole"></span></p>
+                <p><strong data-translate="member_since">Member Since:</strong> <span id="profileJoinDate"></span></p>
+            </div>
+            
+            <!-- Borrowed Books -->
+            <div class="borrowed-books">
+                <h3 data-translate="my_borrowed_books">My Borrowed Books</h3>
+                <div id="myBorrowedBooks"></div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modal for Book Details -->
+    <div id="bookModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="window.closeModal()">&times;</span>
+            <h2 id="modalBookTitle"></h2>
+            <div id="modalBookDetails"></div>
+            <canvas id="barcodeCanvas"></canvas>
+            <button onclick="window.printBarcode()" data-translate="print_barcode">Print Barcode</button>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="loading-spinner" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Custom Scripts -->
+    <script src="firebase.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
