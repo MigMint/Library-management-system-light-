@@ -1,4 +1,4 @@
-// Firebase Configuration
+    // Firebase Configuration
 const firebaseConfig = {
     apiKey: "AIzaSyAgzsZp9Waa4W4IyhNRXIRPKm3h6hX2nrg",
     authDomain: "library-management-syste-fdc63.firebaseapp.com",
@@ -19,9 +19,9 @@ const database = firebase.database();
 
 // EmailJS Configuration
 // IMPORTANT: Replace with your EmailJS credentials
-const EMAILJS_SERVICE_ID = 'service_1r8j8r6';    // Replace with your service ID (e.g., 'service_abc123')
-const EMAILJS_TEMPLATE_ID = 'template_8kb69mb';  // Replace with your template ID (e.g., 'template_xyz789')
-const EMAILJS_PUBLIC_KEY = 'tSqd3HBPWV3iBf7iO';    // Replace with your REAL public key from EmailJS dashboard
+const EMAILJS_SERVICE_ID = 'YOUR_SERVICE_ID';    // Replace with your service ID (e.g., 'service_abc123')
+const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';  // Replace with your template ID (e.g., 'template_xyz789')
+const EMAILJS_PUBLIC_KEY = 'YOUR_PUBLIC_KEY';    // Replace with your REAL public key from EmailJS dashboard
 
 // Initialize EmailJS
 emailjs.init(EMAILJS_PUBLIC_KEY);
@@ -357,6 +357,6 @@ function listenToTransactions(callback) {
 
 // Helper function to generate book barcode data
 function generateBarcodeData(bookId) {
-    // Simple format: LIB + bookId
-    return 'LIB' + bookId.replace(/-/g, '').substring(0, 10).toUpperCase();
+    // Just use the Firebase ID directly
+    return bookId;
 }
