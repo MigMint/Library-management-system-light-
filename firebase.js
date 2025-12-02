@@ -27,15 +27,23 @@ const EMAILJS_PUBLIC_KEY = 'YOUR_PUBLIC_KEY';    // Replace with your REAL publi
 emailjs.init(EMAILJS_PUBLIC_KEY);
 
 // Authentication Functions
+/**
+ * Registers a new user with email, password, name, and role.
+ * @param {string} email - The user's email address.
+ * @param {string} password - The user's password.
+ * @param {string} name - The user's full name.
+ * @param {string} role - The user's role (e.g., 'user', 'staff').
+ * @returns {Promise<object>} - A promise that resolves to an object with success status and user data or an error message.
+ */
 async function registerUser(email, password, name, role) {
     try {
         // Create user account
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
-        
+
         // Wait a moment for auth to propagate
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         // Save user profile to database
         await database.ref('users/' + user.uid).set({
             name: name,
@@ -44,9 +52,9 @@ async function registerUser(email, password, name, role) {
             joinDate: new Date().toISOString(),
             borrowedBooks: []
         });
-        
+
         console.log('User profile saved successfully');
-        
+
         return { success: true, user: user };
     } catch (error) {
         console.error('Registration error:', error);
@@ -54,6 +62,12 @@ async function registerUser(email, password, name, role) {
     }
 }
 
+/**
+ * Logs in a user with email and password.
+ * @param {string} email - The user's email address.
+ * @param {string} password - The user's password.
+ * @returns {Promise<object>} - A promise that resolves to an object with success status and user data or an error message.
+ */
 async function loginUser(email, password) {
     try {
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
@@ -63,11 +77,20 @@ async function loginUser(email, password) {
     }
 }
 
+/**
+ * Logs out the current user.
+ * @returns {Promise<void>} - A promise that resolves when the user is logged out.
+ */
 function logoutUser() {
     return auth.signOut();
 }
 
 // User Profile Functions
+/**
+ * Retrieves the profile of a user.
+ * @param {string} userId - The ID of the user.
+ * @returns {Promise<object|null>} - A promise that resolves to the user's profile object or null if not found.
+ */
 async function getUserProfile(userId) {
     try {
         const snapshot = await database.ref('users/' + userId).once('value');
@@ -78,6 +101,12 @@ async function getUserProfile(userId) {
     }
 }
 
+/**
+ * Updates a user's profile.
+ * @param {string} userId - The ID of the user to update.
+ * @param {object} updates - An object containing the profile fields to update.
+ * @returns {Promise<object>} - A promise that resolves to an object with success status or an error message.
+ */
 async function updateUserProfile(userId, updates) {
     try {
         await database.ref('users/' + userId).update(updates);
@@ -88,11 +117,16 @@ async function updateUserProfile(userId, updates) {
 }
 
 // Book Management Functions
+/**
+ * Adds a new book to the database.
+ * @param {object} bookData - An object containing the book's details.
+ * @returns {Promise<object>} - A promise that resolves to an object with success status and the new book's ID or an error message.
+ */
 async function addBook(bookData) {
     try {
         // Generate unique book ID
         const bookId = database.ref().child('books').push().key;
-        
+
         // Add book ID and timestamp to book data
         bookData.id = bookId;
         bookData.addedDate = new Date().toISOString();
@@ -100,16 +134,22 @@ async function addBook(bookData) {
         bookData.borrowedBy = null;
         bookData.borrowedDate = null;
         bookData.returnDate = null;
-        
+
         // Save to database
         await database.ref('books/' + bookId).set(bookData);
-        
+
         return { success: true, bookId: bookId };
     } catch (error) {
         return { success: false, error: error.message };
     }
 }
 
+/**
+ * Updates a book's information.
+ * @param {string} bookId - The ID of the book to update.
+ * @param {object} updates - An object containing the book fields to update.
+ * @returns {Promise<object>} - A promise that resolves to an object with success status or an error message.
+ */
 async function updateBook(bookId, updates) {
     try {
         await database.ref('books/' + bookId).update(updates);
@@ -119,6 +159,11 @@ async function updateBook(bookId, updates) {
     }
 }
 
+/**
+ * Deletes a book from the database.
+ * @param {string} bookId - The ID of the book to delete.
+ * @returns {Promise<object>} - A promise that resolves to an object with success status or an error message.
+ */
 async function deleteBook(bookId) {
     try {
         await database.ref('books/' + bookId).remove();
@@ -128,6 +173,10 @@ async function deleteBook(bookId) {
     }
 }
 
+/**
+ * Retrieves all books from the database.
+ * @returns {Promise<Array<object>>} - A promise that resolves to an array of book objects.
+ */
 async function getBooks() {
     try {
         const snapshot = await database.ref('books').once('value');
@@ -139,6 +188,11 @@ async function getBooks() {
     }
 }
 
+/**
+ * Retrieves a single book by its ID.
+ * @param {string} bookId - The ID of the book to retrieve.
+ * @returns {Promise<object|null>} - A promise that resolves to the book object or null if not found.
+ */
 async function getBook(bookId) {
     try {
         const snapshot = await database.ref('books/' + bookId).once('value');
@@ -150,13 +204,20 @@ async function getBook(bookId) {
 }
 
 // Borrow/Return Functions
+/**
+ * Borrows a book for a user.
+ * @param {string} bookId - The ID of the book to borrow.
+ * @param {string} userId - The ID of the user borrowing the book.
+ * @param {string} returnDate - The ISO string of the return date.
+ * @returns {Promise<object>} - A promise that resolves to an object with success status or an error message.
+ */
 async function borrowBook(bookId, userId, returnDate) {
     try {
         const book = await getBook(bookId);
         if (!book || !book.available) {
             return { success: false, error: 'Book not available' };
         }
-        
+
         // Update book status
         await database.ref('books/' + bookId).update({
             available: false,
@@ -164,7 +225,7 @@ async function borrowBook(bookId, userId, returnDate) {
             borrowedDate: new Date().toISOString(),
             returnDate: returnDate
         });
-        
+
         // Add to user's borrowed books
         const userProfile = await getUserProfile(userId);
         const borrowedBooks = userProfile.borrowedBooks || [];
@@ -173,9 +234,9 @@ async function borrowBook(bookId, userId, returnDate) {
             borrowedDate: new Date().toISOString(),
             returnDate: returnDate
         });
-        
+
         await database.ref('users/' + userId + '/borrowedBooks').set(borrowedBooks);
-        
+
         // Log transaction
         await logTransaction({
             type: 'borrow',
@@ -184,23 +245,29 @@ async function borrowBook(bookId, userId, returnDate) {
             date: new Date().toISOString(),
             returnDate: returnDate
         });
-        
+
         // Send email reminder (commented out for testing)
         // sendBorrowConfirmation(userProfile.email, userProfile.name, book.title, returnDate);
-        
+
         return { success: true };
     } catch (error) {
         return { success: false, error: error.message };
     }
 }
 
+/**
+ * Returns a borrowed book.
+ * @param {string} bookId - The ID of the book to return.
+ * @param {string} userId - The ID of the user returning the book.
+ * @returns {Promise<object>} - A promise that resolves to an object with success status or an error message.
+ */
 async function returnBook(bookId, userId) {
     try {
         const book = await getBook(bookId);
         if (!book || book.available) {
             return { success: false, error: 'Book not borrowed' };
         }
-        
+
         // Update book status
         await database.ref('books/' + bookId).update({
             available: true,
@@ -208,14 +275,14 @@ async function returnBook(bookId, userId) {
             borrowedDate: null,
             returnDate: null
         });
-        
+
         // Remove from user's borrowed books
         const userProfile = await getUserProfile(userId);
         const borrowedBooks = userProfile.borrowedBooks || [];
         const updatedBooks = borrowedBooks.filter(b => b.bookId !== bookId);
-        
+
         await database.ref('users/' + userId + '/borrowedBooks').set(updatedBooks);
-        
+
         // Log transaction
         await logTransaction({
             type: 'return',
@@ -223,7 +290,7 @@ async function returnBook(bookId, userId) {
             userId: userId,
             date: new Date().toISOString()
         });
-        
+
         return { success: true };
     } catch (error) {
         return { success: false, error: error.message };
@@ -231,6 +298,11 @@ async function returnBook(bookId, userId) {
 }
 
 // Transaction Logging
+/**
+ * Logs a transaction in the database.
+ * @param {object} transactionData - An object containing the transaction details.
+ * @returns {Promise<object>} - A promise that resolves to an object with success status or an error message.
+ */
 async function logTransaction(transactionData) {
     try {
         const transactionId = database.ref().child('transactions').push().key;
@@ -243,6 +315,10 @@ async function logTransaction(transactionData) {
     }
 }
 
+/**
+ * Retrieves the latest transactions.
+ * @returns {Promise<Array<object>>} - A promise that resolves to an array of transaction objects.
+ */
 async function getTransactions() {
     try {
         const snapshot = await database.ref('transactions').orderByChild('date').limitToLast(50).once('value');
@@ -255,13 +331,20 @@ async function getTransactions() {
 }
 
 // Email Functions using EmailJS
+/**
+ * Sends a borrow confirmation email to a user.
+ * @param {string} email - The recipient's email address.
+ * @param {string} name - The recipient's name.
+ * @param {string} bookTitle - The title of the borrowed book.
+ * @param {string} returnDate - The return date of the book.
+ */
 function sendBorrowConfirmation(email, name, bookTitle, returnDate) {
     // Skip if EmailJS not properly configured
     if (EMAILJS_SERVICE_ID === 'YOUR_SERVICE_ID' || EMAILJS_TEMPLATE_ID === 'YOUR_TEMPLATE_ID') {
         console.log('EmailJS not configured - skipping email');
         return;
     }
-    
+
     const templateParams = {
         to_email: email,
         to_name: name,
@@ -269,7 +352,7 @@ function sendBorrowConfirmation(email, name, bookTitle, returnDate) {
         return_date: new Date(returnDate).toLocaleDateString(),
         message: `You have successfully borrowed "${bookTitle}". Please return it by ${new Date(returnDate).toLocaleDateString()}.`
     };
-    
+
     emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams)
         .then(function(response) {
             console.log('Email sent successfully:', response);
@@ -278,6 +361,13 @@ function sendBorrowConfirmation(email, name, bookTitle, returnDate) {
         });
 }
 
+/**
+ * Sends a return reminder email for an overdue book.
+ * @param {string} email - The recipient's email address.
+ * @param {string} name - The recipient's name.
+ * @param {string} bookTitle - The title of the overdue book.
+ * @param {number} daysOverdue - The number of days the book is overdue.
+ */
 function sendReturnReminder(email, name, bookTitle, daysOverdue) {
     const templateParams = {
         to_email: email,
@@ -286,7 +376,7 @@ function sendReturnReminder(email, name, bookTitle, daysOverdue) {
         days_overdue: daysOverdue,
         message: `This is a reminder that "${bookTitle}" is ${daysOverdue} days overdue. Please return it as soon as possible.`
     };
-    
+
     emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams)
         .then(function(response) {
             console.log('Reminder sent successfully:', response);
@@ -296,16 +386,19 @@ function sendReturnReminder(email, name, bookTitle, daysOverdue) {
 }
 
 // Check for overdue books and send reminders
+/**
+ * Checks for overdue books and sends reminder emails.
+ */
 async function checkOverdueBooks() {
     try {
         const books = await getBooks();
         const today = new Date();
-        
+
         for (const book of books) {
             if (!book.available && book.returnDate) {
                 const returnDate = new Date(book.returnDate);
                 const daysOverdue = Math.floor((today - returnDate) / (1000 * 60 * 60 * 24));
-                
+
                 if (daysOverdue > 0) {
                     const user = await getUserProfile(book.borrowedBy);
                     if (user) {
@@ -320,6 +413,10 @@ async function checkOverdueBooks() {
 }
 
 // User Management Functions (Staff only)
+/**
+ * Retrieves all users from the database.
+ * @returns {Promise<Array<object>>} - A promise that resolves to an array of user objects.
+ */
 async function getAllUsers() {
     try {
         const snapshot = await database.ref('users').once('value');
@@ -331,6 +428,12 @@ async function getAllUsers() {
     }
 }
 
+/**
+ * Updates a user's role.
+ * @param {string} userId - The ID of the user to update.
+ * @param {string} newRole - The new role for the user.
+ * @returns {Promise<object>} - A promise that resolves to an object with success status or an error message.
+ */
 async function updateUserRole(userId, newRole) {
     try {
         await database.ref('users/' + userId + '/role').set(newRole);
@@ -341,6 +444,10 @@ async function updateUserRole(userId, newRole) {
 }
 
 // Real-time listeners
+/**
+ * Listens for real-time updates to the books data.
+ * @param {function} callback - The function to call with the updated books data.
+ */
 function listenToBooks(callback) {
     database.ref('books').on('value', (snapshot) => {
         const books = snapshot.val() || {};
@@ -348,6 +455,10 @@ function listenToBooks(callback) {
     });
 }
 
+/**
+ * Listens for real-time updates to the transactions data.
+ * @param {function} callback - The function to call with the updated transactions data.
+ */
 function listenToTransactions(callback) {
     database.ref('transactions').orderByChild('date').limitToLast(50).on('value', (snapshot) => {
         const transactions = snapshot.val() || {};
@@ -356,6 +467,11 @@ function listenToTransactions(callback) {
 }
 
 // Helper function to generate book barcode data
+/**
+ * Generates barcode data for a book.
+ * @param {string} bookId - The ID of the book.
+ * @returns {string} - The barcode data.
+ */
 function generateBarcodeData(bookId) {
     // Just use the Firebase ID directly
     return bookId;
